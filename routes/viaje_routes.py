@@ -35,6 +35,7 @@ def listar_viajes():
         "origen": request.args.get("origen"),
         "destino": request.args.get("destino"),
         "fecha": request.args.get("fecha"),
+        "hora": request.args.get("hora"),
         "estado": request.args.get("estado")
     }
 

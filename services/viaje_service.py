@@ -47,6 +47,14 @@ class ViajeService:
                 filtros.get("fecha"),
                 filtros.get("estado")
             )
+            
+            for viaje in viajes:
+                if "hora" in viaje and viaje["hora"] is not None:
+                    viaje["hora"] = str(viaje["hora"])
+                if "fecha" in viaje and viaje["fecha"] is not None:
+                    viaje["fecha"] = str(viaje["fecha"])
+            
+            
             return viajes, "Viajes obtenidos correctamente", 200
         finally:
             connection.close()
@@ -59,6 +67,11 @@ class ViajeService:
 
             if viaje is None:
                 return None, "Viaje no encontrado", 404
+
+            if "hora" in viaje and viaje["hora"] is not None:
+                viaje["hora"] = str(viaje["hora"])
+            if "fecha" in viaje and viaje["fecha"] is not None:
+                viaje["fecha"] = str(viaje["fecha"])
 
             return viaje, "Viaje obtenido correctamente", 200
         finally:
