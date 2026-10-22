@@ -5,7 +5,8 @@ from repositories.viaje_repository import ViajeRepository
 
 class ViajeService:
     def crear(self, usuario_id, datos):
-        obligatorios = ["origen", "destino", "fecha", "hora", "cupos", "precio"]
+        # Se agregó 'vehiculo_id' como campo obligatorio
+        obligatorios = ["vehiculo_id", "origen", "destino", "fecha", "hora", "cupos", "precio"]
 
         if any(campo not in datos for campo in obligatorios):
             return None, "Faltan datos obligatorios", 400
@@ -16,6 +17,18 @@ class ViajeService:
         if float(datos["precio"]) < 0:
             return None, "El precio no puede ser negativo", 400
 
+        # Validación para evitar crear viajes en el pasado
+        try:
+            # Asume formato "YYYY-MM-DD" y "HH:MM" o "HH:MM:SS"
+            formato_hora = "%H:%M:%S" if len(datos["hora"]) > 5 else "%H:%M"
+            fecha_viaje_str = f"{datos['fecha']} {datos['hora']}"
+            fecha_viaje = datetime.strptime(fecha_viaje_str, f"%Y-%m-%d {formato_hora}")
+            
+            if fecha_viaje < datetime.now():
+                return None, "La fecha y hora del viaje no pueden estar en el pasado", 400
+        except ValueError:
+             return None, "Formato de fecha u hora incorrecto", 400
+
         connection = get_connection()
         try:
             repository = ViajeRepository(connection)
@@ -23,7 +36,6 @@ class ViajeService:
             if conductor_id is None:
                 return None, "El usuario no posee perfil de conductor", 403
 
-            # Ejercicio 7: Evitar viajes duplicados para el mismo conductor, fecha, hora, origen y destino
             if repository.existe_viaje_duplicado(conductor_id, datos["fecha"], datos["hora"], datos["origen"], datos["destino"]):
                 return None, "Ya existe un viaje registrado para el mismo origen, destino, fecha y hora", 409
 
@@ -103,10 +115,15 @@ class ViajeService:
         try:
             repository = ViajeRepository(connection)
 
+            # Trae la data base del viaje, incluyendo conductor y vehículo
             viaje = repository.obtener_por_id(viaje_id)
 
             if viaje is None:
                 return None, "Viaje no encontrado", 404
+
+            # Se incorpora la lista de pasajeros al detalle del viaje
+            pasajeros = repository.obtener_pasajeros(viaje_id)
+            viaje["pasajeros"] = pasajeros
 
             return viaje, "Viaje obtenido correctamente", 200
 

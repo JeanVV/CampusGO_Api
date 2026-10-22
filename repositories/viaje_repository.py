@@ -25,12 +25,17 @@ class ViajeRepository:
                     v.id, v.origen, v.destino, v.fecha, v.hora,
                     v.cupos, v.precio, v.estado,
                     c.usuario_id AS conductor_usuario_id,
-                    u.nombres, u.apellidos,
-                    CONCAT(u.nombres, ' ', u.apellidos) AS conductor,
-                    c.calificacion
+                    CONCAT(u.nombres, ' ', u.apellidos) AS conductor_nombre,
+                    u.foto AS conductor_foto,
+                    c.calificacion,
+                    vh.id AS vehiculo_id,
+                    vh.marca AS vehiculo_marca,
+                    vh.placa AS vehiculo_placa,
+                    vh.foto AS vehiculo_foto
                 FROM viaje v
                 INNER JOIN conductor c ON c.id = v.conductor_id
                 INNER JOIN usuario u ON u.id = c.usuario_id
+                INNER JOIN vehiculo vh ON vh.id = v.vehiculo_id
                 WHERE v.id = %s
             """
             cursor.execute(sql, (viaje_id,))
@@ -43,13 +48,14 @@ class ViajeRepository:
         try:
             sql = """
                 INSERT INTO viaje (
-                conductor_id, origen, destino, fecha,
+                conductor_id, vehiculo_id, origen, destino, fecha,
                 hora, cupos, precio, estado
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, 'DISPONIBLE')
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'DISPONIBLE')
             """
             cursor.execute(sql, (
                 conductor_id,
+                datos["vehiculo_id"],
                 datos["origen"],
                 datos["destino"],
                 datos["fecha"],
@@ -124,21 +130,6 @@ class ViajeRepository:
             sql += " ORDER BY v.fecha, v.hora"
             cursor.execute(sql, tuple(params))
             return cursor.fetchall()
-        finally:
-            cursor.close()
-
-    def obtener_por_id(self, viaje_id):
-        cursor = self.connection.cursor()
-        try:
-            sql = """
-            SELECT
-                v.*, c.usuario_id AS conductor_usuario_id
-            FROM viaje v
-            INNER JOIN conductor c ON c.id = v.conductor_id
-            WHERE v.id = %s
-            """
-            cursor.execute(sql, (viaje_id,))
-            return cursor.fetchone()
         finally:
             cursor.close()
 
@@ -227,6 +218,24 @@ class ViajeRepository:
                 GROUP BY estado
             """
             cursor.execute(sql, (conductor_id,))
+            return cursor.fetchall()
+        finally:
+            cursor.close()
+
+    def obtener_pasajeros(self, viaje_id):
+        cursor = self.connection.cursor()
+        try:
+            sql = """
+                SELECT 
+                    u.id, 
+                    u.nombres, 
+                    u.apellidos, 
+                    u.foto
+                FROM reserva r
+                INNER JOIN usuario u ON r.usuario_id = u.id
+                WHERE r.viaje_id = %s AND r.estado = 'APROBADO'
+            """
+            cursor.execute(sql, (viaje_id,))
             return cursor.fetchall()
         finally:
             cursor.close()
