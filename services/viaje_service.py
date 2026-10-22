@@ -1,12 +1,24 @@
-from datetime import datetime
+from datetime import datetime, date, time, timedelta
 from database import get_connection
 from repositories.viaje_repository import ViajeRepository
 
-
 class ViajeService:
+    def _serializar_fila(self, fila):
+        """Convierte objetos date, time o timedelta de MySQL a string para evitar errores con JSON."""
+        if not fila:
+            return fila
+        for clave, valor in fila.items():
+            if isinstance(valor, (datetime, date, time)):
+                fila[clave] = valor.isoformat()
+            elif isinstance(valor, timedelta):
+                total_seconds = int(valor.total_seconds())
+                horas = total_seconds // 3600
+                minutos = (total_seconds % 3600) // 60
+                fila[clave] = f"{horas:02d}:{minutos:02d}"
+        return fila
+
     def crear(self, usuario_id, datos):
-        # Se agregó 'vehiculo_id' como campo obligatorio
-        obligatorios = ["vehiculo_id", "origen", "destino", "fecha", "hora", "cupos", "precio"]
+        obligatorios = ["origen", "destino", "fecha", "hora", "cupos", "precio"]
 
         if any(campo not in datos for campo in obligatorios):
             return None, "Faltan datos obligatorios", 400
@@ -17,18 +29,6 @@ class ViajeService:
         if float(datos["precio"]) < 0:
             return None, "El precio no puede ser negativo", 400
 
-        # Validación para evitar crear viajes en el pasado
-        try:
-            # Asume formato "YYYY-MM-DD" y "HH:MM" o "HH:MM:SS"
-            formato_hora = "%H:%M:%S" if len(datos["hora"]) > 5 else "%H:%M"
-            fecha_viaje_str = f"{datos['fecha']} {datos['hora']}"
-            fecha_viaje = datetime.strptime(fecha_viaje_str, f"%Y-%m-%d {formato_hora}")
-            
-            if fecha_viaje < datetime.now():
-                return None, "La fecha y hora del viaje no pueden estar en el pasado", 400
-        except ValueError:
-             return None, "Formato de fecha u hora incorrecto", 400
-
         connection = get_connection()
         try:
             repository = ViajeRepository(connection)
@@ -36,7 +36,9 @@ class ViajeService:
             if conductor_id is None:
                 return None, "El usuario no posee perfil de conductor", 403
 
-            if repository.existe_viaje_duplicado(conductor_id, datos["fecha"], datos["hora"], datos["origen"], datos["destino"]):
+            if repository.existe_viaje_duplicado(
+                conductor_id, datos["fecha"], datos["hora"], datos["origen"], datos["destino"]
+            ):
                 return None, "Ya existe un viaje registrado para el mismo origen, destino, fecha y hora", 409
 
             viaje_id = repository.crear(conductor_id, datos)
@@ -53,7 +55,6 @@ class ViajeService:
         p_max = filtros.get("precio_max")
         desde = filtros.get("desde")
 
-        # Ejercicio 1: Validar que los precios sean numéricos y coherentes
         val_min, val_max = None, None
         try:
             if p_min is not None:
@@ -66,14 +67,12 @@ class ViajeService:
         if val_min is not None and val_max is not None and val_min > val_max:
             return None, "precio_min no puede ser mayor que precio_max", 400
 
-        # Ejercicio 3: Validar formato YYYY-MM-DD
         if desde:
             try:
                 datetime.strptime(desde, "%Y-%m-%d")
             except ValueError:
                 return None, "El formato del parámetro 'desde' debe ser YYYY-MM-DD", 400
 
-        # Ejercicio 2: Procesar bandera booleana para cupos > 0 y DISPONIBLE
         solo_disponibles = str(filtros.get("solo_disponibles")).lower() in ("true", "1")
 
         connection = get_connection()
@@ -91,12 +90,11 @@ class ViajeService:
                 desde=desde
             )
 
+            viajes = [self._serializar_fila(v) for v in viajes]
             return viajes, "Viajes obtenidos correctamente", 200
-
         finally:
             connection.close()
 
-    # Ejercicio 4: Consultar mis viajes publicados
     def listar_mios(self, usuario_id):
         connection = get_connection()
         try:
@@ -106,6 +104,7 @@ class ViajeService:
                 return None, "El usuario no posee perfil de conductor", 403
 
             viajes = repository.listar_por_conductor(conductor_id)
+            viajes = [self._serializar_fila(v) for v in viajes]
             return viajes, "Viajes del conductor obtenidos correctamente", 200
         finally:
             connection.close()
@@ -114,19 +113,30 @@ class ViajeService:
         connection = get_connection()
         try:
             repository = ViajeRepository(connection)
-
-            # Trae la data base del viaje, incluyendo conductor y vehículo
             viaje = repository.obtener_por_id(viaje_id)
 
             if viaje is None:
                 return None, "Viaje no encontrado", 404
 
-            # Se incorpora la lista de pasajeros al detalle del viaje
+            viaje = self._serializar_fila(viaje)
             pasajeros = repository.obtener_pasajeros(viaje_id)
             viaje["pasajeros"] = pasajeros
 
             return viaje, "Viaje obtenido correctamente", 200
+        finally:
+            connection.close()
 
+    def obtener_lista_pasajeros(self, viaje_id):
+        connection = get_connection()
+        try:
+            repository = ViajeRepository(connection)
+            viaje = repository.obtener_por_id(viaje_id)
+
+            if viaje is None:
+                return None, "Viaje no encontrado", 404
+
+            pasajeros = repository.obtener_pasajeros(viaje_id)
+            return pasajeros, "Pasajeros obtenidos correctamente", 200
         finally:
             connection.close()
 
@@ -134,7 +144,6 @@ class ViajeService:
         connection = get_connection()
         try:
             repository = ViajeRepository(connection)
-
             viaje = repository.obtener_por_id(viaje_id)
 
             if viaje is None:
@@ -149,14 +158,12 @@ class ViajeService:
             repository.actualizar(viaje_id, datos)
             connection.commit()
             return {"viaje_id": viaje_id}, "Viaje actualizado correctamente", 200
-
         except Exception:
             connection.rollback()
             raise
         finally:
             connection.close()
 
-    # Ejercicio 5: Actualizar solamente los cupos
     def actualizar_cupos(self, usuario_id, viaje_id, datos):
         if "cupos" not in datos:
             return None, "Debe enviar el campo 'cupos'", 400
@@ -192,7 +199,6 @@ class ViajeService:
         finally:
             connection.close()
 
-    # Ejercicio 6: Cambiar el estado del viaje controlando transiciones
     def actualizar_estado(self, usuario_id, viaje_id, datos):
         nuevo_estado = datos.get("estado")
         estados_validos = ("DISPONIBLE", "COMPLETO", "FINALIZADO", "CANCELADO")
@@ -227,7 +233,6 @@ class ViajeService:
         finally:
             connection.close()
 
-    # Ejercicio 9: Cancelar con restricciones de propiedad y estados FINALIZADO / CANCELADO
     def cancelar(self, usuario_id, viaje_id):
         connection = get_connection()
         try:
@@ -249,14 +254,12 @@ class ViajeService:
             repository.cancelar(viaje_id)
             connection.commit()
             return {"viaje_id": viaje_id}, "Viaje cancelado correctamente", 200
-
         except Exception:
             connection.rollback()
             raise
         finally:
             connection.close()
 
-    # Ejercicio 10: Reporte de viajes agrupado por estado
     def obtener_resumen(self, usuario_id):
         connection = get_connection()
         try:

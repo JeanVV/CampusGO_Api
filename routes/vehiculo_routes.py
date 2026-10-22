@@ -35,4 +35,5 @@ def obtener_foto_vehiculo(vehiculo_id):
         return response
 
     except Exception as ex:
-        return error_response(f"No fue posible obtener la foto del vehículo: {str(ex)}", 500)
+        print(f"ERROR FOTO VEHICULO: {ex}")
+        return error_response("No fue posible obtener la foto del vehículo", 500)

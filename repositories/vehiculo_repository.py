@@ -6,9 +6,9 @@ class VehiculoRepository:
         cursor = self.connection.cursor()
         try:
             sql = """
-                SELECT id, marca, modelo, placa, color, capacidad, foto_url 
-                FROM vehiculo 
-                WHERE id = %s 
+                SELECT id, conductor_id, marca, modelo, placa, color, asientos, foto
+                FROM vehiculo
+                WHERE id = %s
                 LIMIT 1
             """
             cursor.execute(sql, (vehiculo_id,))
@@ -19,7 +19,7 @@ class VehiculoRepository:
     def obtener_foto_por_id(self, vehiculo_id):
         cursor = self.connection.cursor()
         try:
-            sql = "SELECT id, foto_url FROM vehiculo WHERE id = %s LIMIT 1"
+            sql = "SELECT id, foto FROM vehiculo WHERE id = %s LIMIT 1"
             cursor.execute(sql, (vehiculo_id,))
             return cursor.fetchone()
         finally:
