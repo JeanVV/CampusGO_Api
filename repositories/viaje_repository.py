@@ -27,14 +27,14 @@ class ViajeRepository:
                     c.usuario_id AS conductor_usuario_id,
                     u.nombres, u.apellidos,
                     CONCAT(u.nombres, ' ', u.apellidos) AS conductor,
-                    u.foto AS conductor_foto,
+                    u.foto_url AS conductor_foto,
                     c.calificacion,
                     vh.id AS vehiculo_id,
                     vh.marca AS vehiculo_marca,
                     vh.modelo AS vehiculo_modelo,
                     vh.placa AS vehiculo_placa,
                     vh.color AS vehiculo_color,
-                    vh.foto AS vehiculo_foto
+                    vh.foto_url AS vehiculo_foto
                 FROM viaje v
                 INNER JOIN conductor c ON c.id = v.conductor_id
                 INNER JOIN usuario u ON u.id = c.usuario_id
@@ -54,16 +54,19 @@ class ViajeRepository:
             sql = """
                 SELECT 
                     u.id AS usuario_id,
+                    p.id AS pasajero_id,
                     u.nombres,
                     u.apellidos,
                     CONCAT(u.nombres, ' ', u.apellidos) AS nombre_completo,
-                    u.email,
-                    u.foto,
-                    r.id AS reserva_id,
-                    r.estado AS estado_reserva
-                FROM reserva r
-                INNER JOIN usuario u ON r.usuario_id = u.id
-                WHERE r.viaje_id = %s AND r.estado != 'CANCELADO'
+                    u.foto_url AS foto,
+                    rv.cantidad AS cupos_reservados,
+                    rv.tipo_tramo,
+                    rv.estado AS estado_reserva
+                FROM reserva_viaje rv
+                INNER JOIN reserva r ON rv.reserva_id = r.id
+                INNER JOIN pasajero p ON r.pasajero_id = p.id
+                INNER JOIN usuario u ON p.usuario_id = u.id
+                WHERE rv.viaje_id = %s AND rv.estado = 'CONFIRMADA'
             """
             cursor.execute(sql, (viaje_id,))
             return cursor.fetchall()
