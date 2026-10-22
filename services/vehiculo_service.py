@@ -26,16 +26,21 @@ class VehiculoService:
             if vehiculo is None:
                 return None, None, "Vehículo no encontrado", 404
 
-            nombre_foto = vehiculo.get("foto")
-            if not nombre_foto:
-                nombre_foto = "default_car.png"
-
+            nombre_foto = vehiculo.get("foto") or "default_car.png"
             nombre_seguro = os.path.basename(nombre_foto)
 
-            # Apunta directamente a uploads/vehiculos en la raíz del proyecto
             directorio_raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             ruta_base = os.path.realpath(os.path.join(directorio_raiz, "uploads", "vehiculos"))
             ruta_archivo = os.path.realpath(os.path.join(ruta_base, nombre_seguro))
+
+            # Si en la BD está como .jpg pero en la carpeta está como .png, probar con .png
+            if not os.path.isfile(ruta_archivo):
+                nombre_sin_ext, _ = os.path.splitext(nombre_seguro)
+                ruta_alternativa = os.path.realpath(os.path.join(ruta_base, f"{nombre_sin_ext}.png"))
+                if os.path.isfile(ruta_alternativa):
+                    ruta_archivo = ruta_alternativa
+                else:
+                    ruta_archivo = os.path.realpath(os.path.join(ruta_base, "default_car.png"))
 
             if os.path.commonpath([ruta_base, ruta_archivo]) != ruta_base:
                 return None, None, "Ruta de foto no válida", 400

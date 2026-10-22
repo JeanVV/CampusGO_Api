@@ -72,12 +72,12 @@ class UsuarioRepository:
     def obtener_foto_por_usuario(self, usuario_id):
         """
         Devuelve únicamente los datos necesarios para autorizar
-        y localizar la foto del usuario autenticado.
+        y localizar la foto del usuario.
         """
         cursor = self.connection.cursor()
         try:
             sql = """
-                SELECT id, foto, estado
+                SELECT id, foto_url AS foto, estado
                 FROM usuario
                 WHERE id = %s
                 LIMIT 1
